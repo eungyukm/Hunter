@@ -10,7 +10,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
 #include "AbilitySystem/LyraAbilitySystemComponent.h"
-#include "AbilitySystem/Attributes/LyraHealthSet.h"
+#include "AbilitySystem/Attributes/LyraRPGStatSet.h"
 #include "Messages/LyraVerbMessage.h"
 #include "Messages/LyraVerbMessageHelpers.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
@@ -35,12 +35,12 @@ ULyraHealthComponent::ULyraHealthComponent(const FObjectInitializer& ObjectIniti
 	DeathState = ELyraDeathState::NotDead;
 }
 
-void ULyraHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(ULyraHealthComponent, DeathState);
-}
+//void ULyraHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+//{
+//	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+//
+//	DOREPLIFETIME(ULyraHealthComponent, DeathState);
+//}
 
 void ULyraHealthComponent::OnUnregister()
 {
@@ -67,7 +67,7 @@ void ULyraHealthComponent::InitializeWithAbilitySystem(ULyraAbilitySystemCompone
 		return;
 	}
 
-	HealthSet = AbilitySystemComponent->GetSet<ULyraHealthSet>();
+	HealthSet = AbilitySystemComponent->GetSet<ULyraRPGStatSet>();
 	if (!HealthSet)
 	{
 		UE_LOG(LogLyra, Error, TEXT("LyraHealthComponent: Cannot initialize health component for owner [%s] with NULL health set on the ability system."), *GetNameSafe(Owner));
@@ -77,15 +77,22 @@ void ULyraHealthComponent::InitializeWithAbilitySystem(ULyraAbilitySystemCompone
 	// Register to listen for attribute changes.
 	HealthSet->OnHealthChanged.AddUObject(this, &ThisClass::HandleHealthChanged);
 	HealthSet->OnMaxHealthChanged.AddUObject(this, &ThisClass::HandleMaxHealthChanged);
+	HealthSet->OnStaminaChanged.AddUObject(this, &ThisClass::HandleStaminaChanged);
+	HealthSet->OnMaxStaminaChanged.AddUObject(this, &ThisClass::HandleMaxStaminaChanged);
+
 	HealthSet->OnOutOfHealth.AddUObject(this, &ThisClass::HandleOutOfHealth);
 
 	// TEMP: Reset attributes to default values.  Eventually this will be driven by a spread sheet.
-	AbilitySystemComponent->SetNumericAttributeBase(ULyraHealthSet::GetHealthAttribute(), HealthSet->GetMaxHealth());
+	AbilitySystemComponent->SetNumericAttributeBase(ULyraRPGStatSet::GetHealthAttribute(), HealthSet->GetMaxHealth());
+	AbilitySystemComponent->SetNumericAttributeBase(ULyraRPGStatSet::GetStaminaAttribute(), HealthSet->GetMaxStamina());
 
 	ClearGameplayTags();
 
 	OnHealthChanged.Broadcast(this, HealthSet->GetHealth(), HealthSet->GetHealth(), nullptr);
 	OnMaxHealthChanged.Broadcast(this, HealthSet->GetHealth(), HealthSet->GetHealth(), nullptr);
+
+	OnStaminaChanged.Broadcast(this, HealthSet->GetStamina(), HealthSet->GetStamina(), nullptr);
+	OnMaxStaminaChanged.Broadcast(this, HealthSet->GetStamina(), HealthSet->GetStamina(), nullptr);
 }
 
 void ULyraHealthComponent::UninitializeFromAbilitySystem()
@@ -96,6 +103,8 @@ void ULyraHealthComponent::UninitializeFromAbilitySystem()
 	{
 		HealthSet->OnHealthChanged.RemoveAll(this);
 		HealthSet->OnMaxHealthChanged.RemoveAll(this);
+		HealthSet->OnStaminaChanged.RemoveAll(this);
+		HealthSet->OnMaxStaminaChanged.RemoveAll(this);
 		HealthSet->OnOutOfHealth.RemoveAll(this);
 	}
 
@@ -135,6 +144,29 @@ float ULyraHealthComponent::GetHealthNormalized() const
 	return 0.0f;
 }
 
+float ULyraHealthComponent::GetStamina() const
+{
+	return (HealthSet ? HealthSet->GetStamina() : 0.0f);
+}
+
+float ULyraHealthComponent::GetMaxStamina() const
+{
+	return (HealthSet ? HealthSet->GetMaxStamina() : 0.0f);
+}
+
+float ULyraHealthComponent::GetStaminaNormalized() const
+{
+	if (HealthSet)
+	{
+		const float Stamina = HealthSet->GetStamina();
+		const float MaxStamina = HealthSet->GetMaxStamina();
+
+		return ((MaxStamina > 0.0f) ? (Stamina / MaxStamina) : 0.0f);
+	}
+
+	return 0.0f;
+}
+
 void ULyraHealthComponent::HandleHealthChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue)
 {
 	OnHealthChanged.Broadcast(this, OldValue, NewValue, DamageInstigator);
@@ -143,6 +175,16 @@ void ULyraHealthComponent::HandleHealthChanged(AActor* DamageInstigator, AActor*
 void ULyraHealthComponent::HandleMaxHealthChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue)
 {
 	OnMaxHealthChanged.Broadcast(this, OldValue, NewValue, DamageInstigator);
+}
+
+void ULyraHealthComponent::HandleStaminaChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue)
+{
+	OnStaminaChanged.Broadcast(this, OldValue, NewValue, DamageInstigator);
+}
+
+void ULyraHealthComponent::HandleMaxStaminaChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue)
+{
+	OnMaxStaminaChanged.Broadcast(this, OldValue, NewValue, DamageInstigator);
 }
 
 void ULyraHealthComponent::HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue)
@@ -187,50 +229,50 @@ void ULyraHealthComponent::HandleOutOfHealth(AActor* DamageInstigator, AActor* D
 #endif // #if WITH_SERVER_CODE
 }
 
-void ULyraHealthComponent::OnRep_DeathState(ELyraDeathState OldDeathState)
-{
-	const ELyraDeathState NewDeathState = DeathState;
-
-	// Revert the death state for now since we rely on StartDeath and FinishDeath to change it.
-	DeathState = OldDeathState;
-
-	if (OldDeathState > NewDeathState)
-	{
-		// The server is trying to set us back but we've already predicted past the server state.
-		UE_LOG(LogLyra, Warning, TEXT("LyraHealthComponent: Predicted past server death state [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
-		return;
-	}
-
-	if (OldDeathState == ELyraDeathState::NotDead)
-	{
-		if (NewDeathState == ELyraDeathState::DeathStarted)
-		{
-			StartDeath();
-		}
-		else if (NewDeathState == ELyraDeathState::DeathFinished)
-		{
-			StartDeath();
-			FinishDeath();
-		}
-		else
-		{
-			UE_LOG(LogLyra, Error, TEXT("LyraHealthComponent: Invalid death transition [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
-		}
-	}
-	else if (OldDeathState == ELyraDeathState::DeathStarted)
-	{
-		if (NewDeathState == ELyraDeathState::DeathFinished)
-		{
-			FinishDeath();
-		}
-		else
-		{
-			UE_LOG(LogLyra, Error, TEXT("LyraHealthComponent: Invalid death transition [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
-		}
-	}
-
-	ensureMsgf((DeathState == NewDeathState), TEXT("LyraHealthComponent: Death transition failed [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
-}
+//void ULyraHealthComponent::OnRep_DeathState(ELyraDeathState OldDeathState)
+//{
+//	const ELyraDeathState NewDeathState = DeathState;
+//
+//	// Revert the death state for now since we rely on StartDeath and FinishDeath to change it.
+//	DeathState = OldDeathState;
+//
+//	if (OldDeathState > NewDeathState)
+//	{
+//		// The server is trying to set us back but we've already predicted past the server state.
+//		UE_LOG(LogLyra, Warning, TEXT("LyraHealthComponent: Predicted past server death state [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
+//		return;
+//	}
+//
+//	if (OldDeathState == ELyraDeathState::NotDead)
+//	{
+//		if (NewDeathState == ELyraDeathState::DeathStarted)
+//		{
+//			StartDeath();
+//		}
+//		else if (NewDeathState == ELyraDeathState::DeathFinished)
+//		{
+//			StartDeath();
+//			FinishDeath();
+//		}
+//		else
+//		{
+//			UE_LOG(LogLyra, Error, TEXT("LyraHealthComponent: Invalid death transition [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
+//		}
+//	}
+//	else if (OldDeathState == ELyraDeathState::DeathStarted)
+//	{
+//		if (NewDeathState == ELyraDeathState::DeathFinished)
+//		{
+//			FinishDeath();
+//		}
+//		else
+//		{
+//			UE_LOG(LogLyra, Error, TEXT("LyraHealthComponent: Invalid death transition [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
+//		}
+//	}
+//
+//	ensureMsgf((DeathState == NewDeathState), TEXT("LyraHealthComponent: Death transition failed [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
+//}
 
 void ULyraHealthComponent::StartDeath()
 {
@@ -303,7 +345,7 @@ void ULyraHealthComponent::DamageSelfDestruct(bool bFellOutOfWorld)
 			Spec->AddDynamicAssetTag(TAG_Gameplay_FellOutOfWorld);
 		}
 
-		const float DamageAmount = GetMaxHealth();
+		const float DamageAmount = -GetMaxHealth();
 
 		Spec->SetSetByCallerMagnitude(LyraGameplayTags::SetByCaller_Damage, DamageAmount);
 		AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec);

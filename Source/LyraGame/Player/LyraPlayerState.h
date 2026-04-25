@@ -154,10 +154,10 @@ private:
 
 	// Health attribute set used by this actor.
 	UPROPERTY()
-	TObjectPtr<const class ULyraHealthSet> HealthSet;
+	TObjectPtr<const class ULyraRPGStatSet> HealthSet;
 	// Combat attribute set used by this actor.
-	UPROPERTY()
-	TObjectPtr<const class ULyraCombatSet> CombatSet;
+	/*UPROPERTY()
+	TObjectPtr<const class ULyraCombatSet> CombatSet;*/
 
 	UPROPERTY(Replicated)
 	ELyraPlayerConnectionType MyPlayerConnectionType;

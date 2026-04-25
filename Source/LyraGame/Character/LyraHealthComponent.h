@@ -11,14 +11,13 @@
 class ULyraHealthComponent;
 
 class ULyraAbilitySystemComponent;
-class ULyraHealthSet;
+class ULyraRPGStatSet;
 class UObject;
 struct FFrame;
 struct FGameplayEffectSpec;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLyraHealth_DeathEvent, AActor*, OwningActor);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FLyraHealth_AttributeChanged, ULyraHealthComponent*, HealthComponent, float, OldValue, float, NewValue, AActor*, Instigator);
-
 /**
  * ELyraDeathState
  *
@@ -38,7 +37,7 @@ enum class ELyraDeathState : uint8
  *
  *	An actor component used to handle anything related to health.
  */
-UCLASS(MinimalAPI, Blueprintable, Meta=(BlueprintSpawnableComponent))
+UCLASS(MinimalAPI, Blueprintable, Meta = (BlueprintSpawnableComponent))
 class ULyraHealthComponent : public UGameFrameworkComponent
 {
 	GENERATED_BODY()
@@ -71,6 +70,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Health")
 	UE_API float GetHealthNormalized() const;
 
+	// Returns the current health value.
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Health")
+	UE_API float GetStamina() const;
+
+	// Returns the current maximum health value.
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Health")
+	UE_API float GetMaxStamina() const;
+
+	// Returns the current health in the range [0.0, 1.0].
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Health")
+	UE_API float GetStaminaNormalized() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Health")
 	ELyraDeathState GetDeathState() const { return DeathState; }
 
@@ -96,6 +107,13 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FLyraHealth_AttributeChanged OnMaxHealthChanged;
 
+	UPROPERTY(BlueprintAssignable)
+	FLyraHealth_AttributeChanged OnStaminaChanged;
+
+	// Delegate fired when the max health value has changed. This is called on the client but the instigator may not be valid
+	UPROPERTY(BlueprintAssignable)
+	FLyraHealth_AttributeChanged OnMaxStaminaChanged;
+
 	// Delegate fired when the death sequence has started.
 	UPROPERTY(BlueprintAssignable)
 	FLyraHealth_DeathEvent OnDeathStarted;
@@ -112,10 +130,10 @@ protected:
 
 	UE_API virtual void HandleHealthChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue);
 	UE_API virtual void HandleMaxHealthChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue);
+	UE_API virtual void HandleStaminaChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue);
+	UE_API virtual void HandleMaxStaminaChanged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue);
 	UE_API virtual void HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec* DamageEffectSpec, float DamageMagnitude, float OldValue, float NewValue);
 
-	UFUNCTION()
-	UE_API virtual void OnRep_DeathState(ELyraDeathState OldDeathState);
 
 protected:
 
@@ -125,10 +143,10 @@ protected:
 
 	// Health set used by this component.
 	UPROPERTY()
-	TObjectPtr<const ULyraHealthSet> HealthSet;
+	TObjectPtr<const ULyraRPGStatSet> HealthSet;
 
 	// Replicated state used to handle dying.
-	UPROPERTY(ReplicatedUsing = OnRep_DeathState)
+	UPROPERTY()
 	ELyraDeathState DeathState;
 };
 
