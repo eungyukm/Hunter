@@ -44,6 +44,8 @@ public:
 
 	virtual void OnUnPossess() override;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = BotIdentifier)
+	int32 BotIdentifier;
 
 private:
 	UFUNCTION()

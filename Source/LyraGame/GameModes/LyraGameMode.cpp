@@ -64,6 +64,20 @@ const ULyraPawnData* ALyraGameMode::GetPawnDataForController(const AController* 
 	if (ExperienceComponent->IsExperienceLoaded())
 	{
 		const ULyraExperienceDefinition* Experience = ExperienceComponent->GetCurrentExperienceChecked();
+
+		if (InController->IsPlayerController())
+		{
+			return Experience->DefaultPawnData;
+		}
+		else if (const ALyraPlayerBotController* BotController = Cast<ALyraPlayerBotController>(InController))
+		{
+			const ULyraPawnData* LyraEnemyPawnData = Experience->EnemyPawnClasses[BotController->BotIdentifier];
+			if (LyraEnemyPawnData != nullptr)
+			{
+				return LyraEnemyPawnData;
+			}
+		}
+
 		if (Experience->DefaultPawnData != nullptr)
 		{
 			return Experience->DefaultPawnData;

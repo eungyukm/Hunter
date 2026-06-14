@@ -42,6 +42,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category=Gameplay)
 	TObjectPtr<const ULyraPawnData> DefaultPawnData;
 
+	UPROPERTY(EditDefaultsOnly, Category = Gameplay)
+	TMap<int32, TObjectPtr<const ULyraPawnData>> EnemyPawnClasses;
+
 	// List of actions to perform as this experience is loaded/activated/deactivated/unloaded
 	UPROPERTY(EditDefaultsOnly, Instanced, Category="Actions")
 	TArray<TObjectPtr<UGameFeatureAction>> Actions;
